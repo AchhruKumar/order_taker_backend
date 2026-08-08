@@ -123,7 +123,7 @@ Return strictly valid JSON with this shape:
 
       if (response.ok) {
         captureQuotaHeaders(response.headers);
-        const data = await response.json();
+        const data: any = await response.json();
         const parsed = JSON.parse(data.choices[0].message.content);
         console.log('✅ Groq Cloud response:', parsed.action, parsed.spokenResponse);
         return parsed as AIOrderResponse;
@@ -240,6 +240,7 @@ function fallbackNLPProcessor(
   }
 
   // Dynamic Menu Item Match against database catalog (supports newly added dishes!)
+  const itemsToAdd: Array<{ itemName: string; quantity: number; modifiers?: string[] }> = [];
   if (Array.isArray(menu)) {
     for (const category of menu) {
       if (Array.isArray(category.items)) {
