@@ -1,0 +1,103 @@
+// Prisma Schema for V1 Order Taker (PostgreSQL / SQLite compatible)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id           String     @id @default(uuid())
+  name         String
+  icon         String     @default("Utensils")
+  displayOrder Int        @default(0)
+  items        MenuItem[]
+  createdAt    DateTime   @default(now())
+}
+
+model MenuItem {
+  id             String          @id @default(uuid())
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name           String
+  description    String
+  basePrice      Float
+  isAvailable    Boolean         @default(true)
+  imageUrl       String?
+  modifierGroups ModifierGroup[]
+  orderItems     OrderItem[]
+  createdAt      DateTime        @default(now())
+}
+
+model ModifierGroup {
+  id         String           @id @default(uuid())
+  menuItemId String?
+  menuItem   MenuItem?        @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String
+  minSelect  Int              @default(0)
+  maxSelect  Int              @default(1)
+  required   Boolean          @default(false)
+  options    ModifierOption[]
+}
+
+model ModifierOption {
+  id         String        @id @default(uuid())
+  groupId    String
+  group      ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name       String
+  extraPrice Float         @default(0.0)
+}
+
+model Order {
+  id           String         @id @default(uuid())
+  orderNumber  Int            @default(1001)
+  customerName String         @default("Guest Customer")
+  status       String         @default("DRAFT") // DRAFT, CONFIRMED, COMPLETED, CANCELLED
+  subtotal     Float          @default(0.0)
+  taxRate      Float          @default(0.08875) // 8.875% tax
+  taxAmount    Float          @default(0.0)
+  tipAmount    Float          @default(0.0)
+  totalAmount  Float          @default(0.0)
+  items        OrderItem[]
+  eventsLog    OrderEventLog[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model OrderItem {
+  id                  String              @id @default(uuid())
+  orderId             String
+  order               Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId          String
+  menuItem            MenuItem            @relation(fields: [menuItemId], references: [id])
+  quantity            Int                 @default(1)
+  unitPrice           Float
+  subtotal            Float
+  specialInstructions String?
+  modifiers           OrderItemModifier[]
+  createdAt           DateTime            @default(now())
+}
+
+model OrderItemModifier {
+  id          String    @id @default(uuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  groupId     String
+  optionId    String
+  optionName  String
+  priceDelta  Float     @default(0.0)
+}
+
+model OrderEventLog {
+  id             String   @id @default(uuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  timestamp      DateTime @default(now())
+  speaker        String   // "USER" | "AGENT"
+  utterance      String
+  actionType     String   // "ADD_ITEM", "MODIFY_ITEM", "REMOVE_ITEM", "INQUIRE_MENU", "RESET_ORDER", "CONFIRM_ORDER"
+  stateDeltaJson String   // JSON string of change deltas
+}
