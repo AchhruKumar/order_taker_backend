@@ -3,7 +3,7 @@ import { prisma } from '../services/dbClient.js';
 
 export async function getMenu(req: Request, res: Response) {
   try {
-    const categories = await prisma.category.findMany({
+    let categories = await prisma.category.findMany({
       orderBy: { displayOrder: 'asc' },
       include: {
         items: {
@@ -17,6 +17,33 @@ export async function getMenu(req: Request, res: Response) {
         }
       }
     });
+
+    if (categories.length === 0) {
+      const defaultCats = [
+        { name: 'Gourmet Burgers', icon: 'Beef', displayOrder: 1 },
+        { name: 'Artisanal Pizzas', icon: 'Pizza', displayOrder: 2 },
+        { name: 'Sides & Starters', icon: 'Fries', displayOrder: 3 },
+        { name: 'Beverages', icon: 'CupSoda', displayOrder: 4 },
+        { name: 'Desserts', icon: 'IceCream', displayOrder: 5 }
+      ];
+      for (const cat of defaultCats) {
+        await prisma.category.create({ data: cat });
+      }
+      categories = await prisma.category.findMany({
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          items: {
+            include: {
+              modifierGroups: {
+                include: {
+                  options: true
+                }
+              }
+            }
+          }
+        }
+      });
+    }
 
     res.json({ categories });
   } catch (err: any) {
@@ -32,9 +59,23 @@ export async function createMenuItem(req: Request, res: Response) {
       return res.status(400).json({ error: 'Name, categoryId, and numeric basePrice are required' });
     }
 
+    let targetCategoryId = categoryId;
+    const existingCat = await prisma.category.findUnique({ where: { id: categoryId } });
+    if (!existingCat) {
+      const firstCat = await prisma.category.findFirst();
+      if (firstCat) {
+        targetCategoryId = firstCat.id;
+      } else {
+        const newCat = await prisma.category.create({
+          data: { name: 'Gourmet Burgers', displayOrder: 1 }
+        });
+        targetCategoryId = newCat.id;
+      }
+    }
+
     const item = await prisma.menuItem.create({
       data: {
-        categoryId,
+        categoryId: targetCategoryId,
         name,
         description: description || '',
         basePrice,
