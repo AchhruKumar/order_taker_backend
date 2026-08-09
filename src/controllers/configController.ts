@@ -12,6 +12,7 @@ export function getGroqKeyStatus(req: Request, res: Response) {
   const key = process.env.GROQ_API_KEY || '';
   res.json({
     hasKey: key.length > 0,
+    apiKey: key,
     keyPreview: key.length > 8 ? `${key.slice(0, 8)}...${key.slice(-4)}` : ''
   });
 }
@@ -33,17 +34,23 @@ export function updateGroqKey(req: Request, res: Response) {
     // Update in memory immediately (no restart needed)
     process.env.GROQ_API_KEY = trimmedKey;
 
-    // Also persist to .env file
+    // Also persist to .env file reliably
+    let envContent = '';
     if (fs.existsSync(ENV_PATH)) {
-      let envContent = fs.readFileSync(ENV_PATH, 'utf-8');
+      envContent = fs.readFileSync(ENV_PATH, 'utf-8');
       // Remove any commented or active GROQ_API_KEY line first
       envContent = envContent.replace(/^#?\s*GROQ_API_KEY=.*$/gm, '').trim();
-      envContent += `\nGROQ_API_KEY="${trimmedKey}"\n`;
-      fs.writeFileSync(ENV_PATH, envContent, 'utf-8');
     }
+    envContent = (envContent ? envContent + '\n' : '') + `GROQ_API_KEY="${trimmedKey}"\n`;
+    fs.writeFileSync(ENV_PATH, envContent, 'utf-8');
 
     console.log(`🔑 GROQ_API_KEY updated live: ${trimmedKey.slice(0, 8)}...`);
-    res.json({ success: true, message: 'Groq API key updated successfully', keyPreview: `${trimmedKey.slice(0, 8)}...${trimmedKey.slice(-4)}` });
+    res.json({
+      success: true,
+      message: 'Groq API key updated successfully',
+      apiKey: trimmedKey,
+      keyPreview: `${trimmedKey.slice(0, 8)}...${trimmedKey.slice(-4)}`
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

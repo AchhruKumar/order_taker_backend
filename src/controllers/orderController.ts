@@ -128,6 +128,7 @@ export async function confirmOrder(req: Request, res: Response) {
 export async function getAllOrders(req: Request, res: Response) {
   try {
     const orders = await prisma.order.findMany({
+      where: { status: 'CONFIRMED' },
       orderBy: { createdAt: 'desc' },
       include: {
         items: {

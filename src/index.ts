@@ -5,7 +5,14 @@ import { getMenu, createMenuItem, updateMenuItem, deleteMenuItem } from './contr
 import { getCurrentOrder, processVoiceCommand, resetOrder, confirmOrder, getAllOrders, deleteOrder, deleteAllOrders } from './controllers/orderController.js';
 import { getSchemaInspectorData } from './controllers/schemaController.js';
 import { getGroqKeyStatus, updateGroqKey, getGroqQuota } from './controllers/configController.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, '../.env');
+
+dotenv.config({ path: envPath });
 dotenv.config();
 
 const app = express();
