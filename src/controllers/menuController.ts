@@ -59,23 +59,28 @@ export async function createMenuItem(req: Request, res: Response) {
       return res.status(400).json({ error: 'Name, categoryId, and numeric basePrice are required' });
     }
 
-    let targetCategoryId = categoryId;
-    const existingCat = await prisma.category.findUnique({ where: { id: categoryId } });
-    if (!existingCat) {
-      const firstCat = await prisma.category.findFirst();
-      if (firstCat) {
-        targetCategoryId = firstCat.id;
-      } else {
-        const newCat = await prisma.category.create({
-          data: { name: 'Gourmet Burgers', displayOrder: 1 }
-        });
-        targetCategoryId = newCat.id;
+    let targetCategory = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { id: categoryId },
+          { name: { contains: categoryId.replace(/^cat-/, ''), mode: 'insensitive' } }
+        ]
       }
+    });
+
+    if (!targetCategory) {
+      targetCategory = await prisma.category.findFirst();
+    }
+
+    if (!targetCategory) {
+      targetCategory = await prisma.category.create({
+        data: { name: 'Gourmet Burgers', displayOrder: 1 }
+      });
     }
 
     const item = await prisma.menuItem.create({
       data: {
-        categoryId: targetCategoryId,
+        categoryId: targetCategory.id,
         name,
         description: description || '',
         basePrice,
