@@ -51,30 +51,62 @@ export async function getMenu(req: Request, res: Response) {
   }
 }
 
-async function resolveValidCategoryId(rawCategoryId?: string): Promise<string> {
+async function resolveValidCategoryId(
+  rawCategoryId?: string
+): Promise<string> {
   if (rawCategoryId) {
-    // 1. Check exact ID match
-    const catById = await prisma.category.findUnique({ where: { id: rawCategoryId } });
-    if (catById) return catById.id;
+    // 1. Exact ID
+    const catById = await prisma.category.findUnique({
+      where: {
+        id: rawCategoryId
+      }
+    });
 
-    // 2. Check name match (e.g. 'cat-burgers' -> 'burgers' matches 'Gourmet Burgers')
-    const cleanSearch = rawCategoryId.replace(/^cat-/, '').trim();
+    if (catById) {
+      return catById.id;
+    }
+
+    // 2. Try category name
+    const cleanSearch = rawCategoryId
+      .replace(/^cat-/, '')
+      .trim();
+
     if (cleanSearch) {
       const catByName = await prisma.category.findFirst({
-        where: { name: { contains: cleanSearch, mode: 'insensitive' } }
+        where: {
+          name: {
+            contains: cleanSearch,
+            mode: 'insensitive'
+          }
+        }
       });
-      if (catByName) return catByName.id;
+
+      if (catByName) {
+        return catByName.id;
+      }
     }
   }
 
-  // 3. Fallback to any existing category
-  const firstCat = await prisma.category.findFirst({ orderBy: { displayOrder: 'asc' } });
-  if (firstCat) return firstCat.id;
-
-  // 4. Create default category if DB is empty
-  const defaultCat = await prisma.category.create({
-    data: { name: 'Gourmet Burgers', icon: 'Beef', displayOrder: 1 }
+  // 3. Existing category
+  const firstCat = await prisma.category.findFirst({
+    orderBy: {
+      displayOrder: 'asc'
+    }
   });
+
+  if (firstCat) {
+    return firstCat.id;
+  }
+
+  // 4. Create default category
+  const defaultCat = await prisma.category.create({
+    data: {
+      name: 'Gourmet Burgers',
+      icon: 'Beef',
+      displayOrder: 1
+    }
+  });
+
   return defaultCat.id;
 }
 
@@ -99,7 +131,9 @@ export async function createMenuItem(req: Request, res: Response) {
       },
       include: {
         modifierGroups: {
-          include: { options: true }
+          include: {
+            options: true
+          }
         }
       }
     });
