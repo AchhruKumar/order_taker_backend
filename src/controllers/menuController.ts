@@ -51,6 +51,33 @@ export async function getMenu(req: Request, res: Response) {
   }
 }
 
+async function resolveValidCategoryId(rawCategoryId?: string): Promise<string> {
+  if (rawCategoryId) {
+    // 1. Check exact ID match
+    const catById = await prisma.category.findUnique({ where: { id: rawCategoryId } });
+    if (catById) return catById.id;
+
+    // 2. Check name match (e.g. 'cat-burgers' -> 'burgers' matches 'Gourmet Burgers')
+    const cleanSearch = rawCategoryId.replace(/^cat-/, '').trim();
+    if (cleanSearch) {
+      const catByName = await prisma.category.findFirst({
+        where: { name: { contains: cleanSearch, mode: 'insensitive' } }
+      });
+      if (catByName) return catByName.id;
+    }
+  }
+
+  // 3. Fallback to any existing category
+  const firstCat = await prisma.category.findFirst({ orderBy: { displayOrder: 'asc' } });
+  if (firstCat) return firstCat.id;
+
+  // 4. Create default category if DB is empty
+  const defaultCat = await prisma.category.create({
+    data: { name: 'Gourmet Burgers', icon: 'Beef', displayOrder: 1 }
+  });
+  return defaultCat.id;
+}
+
 export async function createMenuItem(req: Request, res: Response) {
   try {
     const { categoryId, name, description, basePrice, isAvailable, imageUrl } = req.body;
@@ -59,28 +86,11 @@ export async function createMenuItem(req: Request, res: Response) {
       return res.status(400).json({ error: 'Name, categoryId, and numeric basePrice are required' });
     }
 
-    let targetCategory = await prisma.category.findFirst({
-      where: {
-        OR: [
-          { id: categoryId },
-          { name: { contains: categoryId.replace(/^cat-/, ''), mode: 'insensitive' } }
-        ]
-      }
-    });
-
-    if (!targetCategory) {
-      targetCategory = await prisma.category.findFirst();
-    }
-
-    if (!targetCategory) {
-      targetCategory = await prisma.category.create({
-        data: { name: 'Gourmet Burgers', displayOrder: 1 }
-      });
-    }
+    const validCategoryId = await resolveValidCategoryId(categoryId);
 
     const item = await prisma.menuItem.create({
       data: {
-        categoryId: targetCategory.id,
+        categoryId: validCategoryId,
         name,
         description: description || '',
         basePrice,
@@ -107,10 +117,15 @@ export async function updateMenuItem(req: Request, res: Response) {
 
     if (!id) return res.status(400).json({ error: 'Item ID is required' });
 
+    let validCategoryId: string | undefined = undefined;
+    if (categoryId) {
+      validCategoryId = await resolveValidCategoryId(categoryId);
+    }
+
     const item = await prisma.menuItem.update({
       where: { id },
       data: {
-        ...(categoryId && { categoryId }),
+        ...(validCategoryId && { categoryId: validCategoryId }),
         ...(name && { name }),
         ...(description !== undefined && { description }),
         ...(typeof basePrice === 'number' && { basePrice }),
